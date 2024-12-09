@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Weather AI App</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, sans-serif; 
+            color: white; 
+            height: 100vh; /* Ensure full height for body */
+            background-color: #2c3e50; /* Dark background for the body */
+        }
+        #map { 
+            position: absolute; 
+            top: 0; 
+            bottom: 0; 
+            width: 100%; 
+        }
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            width: 300px;
+        }
+        input, button {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: none;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .popup-content {
+            background-color: #34495e; /* Dark background for popup */
+            color: white; /* White text for better contrast */
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+        .popup-content h2 {
+            margin: 0;
+            font-size: 16px;
+        }
+        .popup-content p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .mapboxgl-popup-close-button {
+            background-color: #e74c3c; /* Red background */
+            color: white; /* White color */
+            border: none; /* No border */
+            border-radius: 50%; /* Rounded shape */
+            width: 30px; /* Width of button */
+            height: 30px; /* Height of button */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer; /* Pointer cursor on hover */
+        }
+
+        .mapboxgl-popup-close-button:hover {
+            background-color: #c0392b; /* Darker red on hover */
+        }
+
+        .mapboxgl-popup-close-button:focus {
+            outline: none; /* Remove outline on focus */
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="overlay">
+        <h1>Weather AI App</h1>
+        <input type="text" id="city" placeholder="Enter city name" />
+        <button id="getWeather">Get Weather</button>
+        <button id="getCurrentLocation">Use My Location</button>
+    </div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoibGxhbmViZSIsImEiOiJjbTJ3bjlnZmQwOHJuMnBwemJsaGoyYmt4In0.OTRwnjqS_4uaLPs_214jCw';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [-98.5795, 39.8283], // Initial center [lng, lat]
+            zoom: 3
+        });
+
+        // Declare popup variable outside functions to manage it properly
+        let popup;
+
+        document.getElementById('getWeather').addEventListener('click', getWeather);
+        document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
+
+        async function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async position => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    await fetchWeatherByCoordinates(lat, lon);
+                    map.flyTo({ center: [lon, lat], zoom: 7 });
+                }, () => alert('Could not retrieve location. Please allow location access.'));
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+
+        async function fetchWeatherByCoordinates(lat, lon) {
+            const apiKey = '20508479ef3f34750a57afcbca7ea2a0'; // Your weather API key
+
+            try {
+                const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial`);
+                if (!response.ok) throw new Error('Weather data not available');
+                const data = await response.json();
+
+                const temperature = data.main.temp;
+                const description = data.weather[0].description;
+                const windSpeed = data.wind.speed;
+                const humidity = data.main.humidity;
+                const locationDetails = `${data.name}, ${data.sys.country}`;
+
+                const weatherInfo = `
+                    <div class="popup-content">
+                        <h2>${locationDetails}</h2>
+                        <p>Temperature: ${temperature} °F</p>
+                        <p>Description: ${description}</p>
+                        <p>Wind Speed: ${windSpeed} mph</p>
+                        <p>Humidity: ${humidity}%</p>
+                    </div>
+                `;
+
+                // Create a new popup instance
+                popup = new mapboxgl.Popup({
+                    closeButton: true,
+                    closeOnClick: false
+                })
+                .setLngLat([lon, lat])
+                .setHTML(weatherInfo)
+                .addTo(map);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function getWeather() {
+            const city = document.getElementById('city').value;
+            const apiKey = '20508479ef3f34750a57afcbca7ea2a0'; // Your weather API key
+
+            try {
+                const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=imperial`);
+                if (!response.ok) throw new Error('City not found');
+                const data = await response.json();
+
+                const temperature = data.main.temp;
+                const description = data.weather[0].description;
+                const windSpeed = data.wind.speed;
+                const humidity = data.main.humidity;
+                const locationDetails = `${data.name}, ${data.sys.country}`;
+
+                const weatherInfo = `
+                    <div class="popup-content">
+                        <h2>${locationDetails}</h2>
+                        <p>Temperature: ${temperature} °F</p>
+                        <p>Description: ${description}</p>
+                        <p>Wind Speed: ${windSpeed} mph</p>
+                        <p>Humidity: ${humidity}%</p>
+                    </div>
+                `;
+
+                // Create a new popup instance
+                popup = new mapboxgl.Popup({
+                    closeButton: true,
+                    closeOnClick: false
+                })
+                .setLngLat([data.coord.lon, data.coord.lat])
+                .setHTML(weatherInfo)
+                .addTo(map);
+
+                map.flyTo({ center: [data.coord.lon, data.coord.lat], zoom: 7 });
+            } catch (error) {
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
